@@ -1,10 +1,9 @@
 "use client";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { Loader2, Lock } from "lucide-react";
 
 export function UnlockForm() {
-  const router = useRouter();
   const next = useSearchParams().get("next") ?? "/generate";
   const [code, setCode] = useState("");
   const [err, setErr] = useState<string | null>(null);
@@ -16,8 +15,9 @@ export function UnlockForm() {
     const r = await fetch("/api/unlock", { method: "POST", body: JSON.stringify({ code }) });
     setBusy(false);
     if (!r.ok) return setErr((await r.json()).error);
-    router.replace(next.startsWith("/") && !next.startsWith("//") ? next : "/generate");
-    router.refresh();
+    // Full page load: a client navigation can reuse the cached pre-unlock
+    // redirect to /unlock, which made the first click look like it failed.
+    window.location.replace(next.startsWith("/") && !next.startsWith("//") ? next : "/generate");
   }
 
   return (
