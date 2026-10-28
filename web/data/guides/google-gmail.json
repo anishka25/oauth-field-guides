@@ -1,0 +1,89 @@
+{
+  "slug": "google-gmail",
+  "name": "Google (Gmail / Workspace)",
+  "website": "https://console.cloud.google.com",
+  "category": "Email & productivity",
+  "summary": "You can create the OAuth client in 15 minutes, but the Gmail read scopes are 'restricted'. Going public requires brand verification plus a third-party CASA security assessment, which takes weeks and usually costs money.",
+  "origin": "curated",
+  "mode": "research-only",
+  "lastVerified": "2026-10-27",
+  "verdict": { "difficulty": 5, "label": "Gated", "headline": "Testing works today for 100 users. Production Gmail access means a CASA security assessment and weeks of review." },
+  "timeline": {
+    "setupMinutes": { "min": 20, "max": 90 },
+    "approvalWait": { "min": 4, "max": 12, "unit": "weeks", "appliesWhen": "when publishing to production with sensitive or restricted scopes (e.g. gmail.readonly, gmail.send)" },
+    "summary": "Hands-on today; the production wait is dominated by verification and the CASA assessment"
+  },
+  "agentVsHuman": {
+    "agent": [
+      "Classify each scope you need as non-sensitive, sensitive or restricted, and suggest narrower ones",
+      "Draft the scope justification text and the demo-video script for the verification form",
+      "Check that the homepage, privacy policy and authorized domains match before you submit",
+      "Validate your client_id against Google's authorize endpoint (Google rejects unknown clients without login)"
+    ],
+    "human": [
+      "Sign in to Google Cloud Console and create a project",
+      "Verify domain ownership in Google Search Console",
+      "Record and upload the demo video showing the consent screen and each scope's use",
+      "Engage a CASA assessor (often paid) and complete the assessment",
+      "Answer reviewer emails; reviewers often ask for changes"
+    ]
+  },
+  "steps": [
+    { "title": "Create a Cloud project and enable the Gmail API", "detail": "Console → New project → APIs & Services → Library → Gmail API → Enable.", "actor": "human", "duration": "5 min", "url": "https://console.cloud.google.com/apis/library/gmail.googleapis.com", "copyables": [], "evidence": { "kind": "sourced", "sourceIds": ["gmail-auth"], "note": "" } },
+    { "title": "Configure the OAuth consent screen (Google Auth Platform)", "detail": "Set the app name, support email, logo, authorized domains, homepage and privacy policy URL. Choose External. The app starts in Testing: only listed test users (max 100) can grant consent, and refresh tokens expire after 7 days.", "actor": "human", "duration": "10 min", "url": "https://console.cloud.google.com/auth/branding", "copyables": [], "evidence": { "kind": "sourced", "sourceIds": ["consent", "testing"], "note": "7-day refresh token expiry in Testing is documented" } },
+    { "title": "Create OAuth client ID (Web application)", "detail": "Add authorized redirect URIs. Exact match required, and https is needed except for localhost.", "actor": "human", "duration": "3 min", "url": "https://console.cloud.google.com/auth/clients", "copyables": [ { "label": "Redirect (local)", "value": "http://localhost:3000/api/auth/callback/google" } ], "evidence": { "kind": "sourced", "sourceIds": ["webflow"], "note": "" } },
+    { "title": "Validate the client and run a test consent", "detail": "Agent requests the authorize URL with your client_id. An unknown client gives an 'invalid_client' error; a valid one shows Google sign-in. Then a test user completes the flow with access_type=offline&prompt=consent to get a refresh token.", "actor": "agent", "duration": "5 min", "url": null, "copyables": [], "evidence": { "kind": "tested", "sourceIds": [], "note": "Fake client_id → 302 to signin/oauth/error?authError=invalid_client" } },
+    { "title": "Minimize scopes", "detail": "If you can use gmail.send alone, or a non-Gmail alternative, you may avoid CASA. Restricted scopes include gmail.readonly, gmail.modify and gmail.compose.", "actor": "agent", "duration": "10 min", "url": "https://developers.google.com/gmail/api/auth/scopes", "copyables": [], "evidence": { "kind": "sourced", "sourceIds": ["scopes"], "note": "Scope tiers listed on Gmail scopes page" } },
+    { "title": "Submit for brand + scope verification", "detail": "Requires a verified domain, a privacy policy describing Google data use (Limited Use), a scope justification and a demo video.", "actor": "human", "duration": "1–2 h", "url": null, "copyables": [], "evidence": { "kind": "sourced", "sourceIds": ["verify"], "note": "" } },
+    { "title": "CASA security assessment and Google review", "detail": "Restricted scopes need a Cloud Application Security Assessment by an authorized lab, and it's re-done annually. Review rounds with Google commonly add weeks.", "actor": "wait", "duration": "4–12 weeks", "url": "https://appdefensealliance.dev/casa", "copyables": [], "evidence": { "kind": "inferred", "sourceIds": ["verify", "casa"], "note": "Duration is from community reports; Google gives no SLA" } }
+  ],
+  "requirements": [
+    { "item": "Verified domain (Search Console)", "required": "required", "note": "Homepage and privacy policy must be on an authorized domain you own.", "evidence": { "kind": "sourced", "sourceIds": ["verify"], "note": "" } },
+    { "item": "Privacy policy with Limited Use disclosure", "required": "required", "note": "Must state compliance with the Google API Services User Data Policy.", "evidence": { "kind": "sourced", "sourceIds": ["verify"], "note": "" } },
+    { "item": "Demo video (YouTube, unlisted)", "required": "conditional", "note": "Needed for sensitive or restricted scopes.", "evidence": { "kind": "sourced", "sourceIds": ["verify"], "note": "" } },
+    { "item": "CASA Tier 2 assessment", "required": "conditional", "note": "Restricted scopes only. Usually paid via an assessor lab; renewed yearly.", "evidence": { "kind": "sourced", "sourceIds": ["casa"], "note": "" } }
+  ],
+  "scopes": [
+    { "name": "openid email profile", "tier": "basic", "purpose": "Sign in; no verification beyond branding" },
+    { "name": "gmail.send", "tier": "sensitive", "purpose": "Send mail only: verification, but no CASA" },
+    { "name": "gmail.readonly", "tier": "restricted", "purpose": "Read mail: verification + CASA" },
+    { "name": "gmail.modify", "tier": "restricted", "purpose": "Read/label/delete: verification + CASA" }
+  ],
+  "endpoints": {
+    "authorizeUrl": "https://accounts.google.com/o/oauth2/v2/auth",
+    "tokenUrl": "https://oauth2.googleapis.com/token",
+    "discoveryUrl": "https://accounts.google.com/.well-known/openid-configuration",
+    "pkce": "supported",
+    "dynamicRegistration": "no",
+    "refreshTokens": "Yes, with access_type=offline (7-day expiry while in Testing)",
+    "tokenLifetime": "1 hour",
+    "evidence": { "kind": "tested", "sourceIds": [], "note": "Discovery doc fetched: PKCE plain+S256, no registration_endpoint" }
+  },
+  "blockers": [
+    { "symptom": "'Access blocked: app has not completed the Google verification process'", "cause": "The user isn't on the test-user list while the app is in Testing.", "fix": "Add them under Audience → Test users, or publish and complete verification." },
+    { "symptom": "Refresh tokens stop working after a week", "cause": "Apps in Testing get 7-day refresh tokens.", "fix": "Publish the app to production. You can publish non-verified for basic scopes." },
+    { "symptom": "Verification rejected: 'scopes not justified'", "cause": "The demo video didn't show each scope being used in-product.", "fix": "Re-record showing the consent screen with the client ID visible and each feature using the data." }
+  ],
+  "gotchas": [
+    { "title": "Restricted scope = CASA every year", "detail": "This is the single biggest cost in Google integrations. Design your agent so it can work with gmail.send or the Workspace add-on model if you can.", "severity": "critical" },
+    { "title": "Workspace-internal apps skip verification", "detail": "If your users are all in one Workspace org, an Internal app skips verification. That doesn't help multi-tenant SaaS.", "severity": "info" },
+    { "title": "Over 100 unverified users is a hard cap", "detail": "An unverified app with sensitive scopes stops at 100 lifetime users.", "severity": "warn" }
+  ],
+  "tested": [
+    { "check": "GET accounts.google.com/.well-known/openid-configuration", "result": "200, PKCE [plain, S256], no registration_endpoint", "outcome": "pass" },
+    { "check": "GET /o/oauth2/v2/auth with fake client_id", "result": "302 → signin/oauth/error authError=invalid_client ('The OAuth client was not found')", "outcome": "pass" }
+  ],
+  "uncertainties": [
+    "CASA cost varies by assessor and tier; we haven't priced it.",
+    "The verification turnaround (4–12 weeks) comes from community reports, not a Google SLA."
+  ],
+  "sources": [
+    { "id": "gmail-auth", "title": "Gmail API: Choose scopes / authorize", "url": "https://developers.google.com/workspace/gmail/api/auth/about-auth" },
+    { "id": "scopes", "title": "Gmail API scopes (sensitivity tiers)", "url": "https://developers.google.com/gmail/api/auth/scopes" },
+    { "id": "consent", "title": "Configure the OAuth consent screen", "url": "https://developers.google.com/workspace/guides/configure-oauth-consent" },
+    { "id": "testing", "title": "OAuth 2.0: refresh token expiration (Testing status)", "url": "https://developers.google.com/identity/protocols/oauth2#expiration" },
+    { "id": "webflow", "title": "OAuth 2.0 for Web Server Applications", "url": "https://developers.google.com/identity/protocols/oauth2/web-server" },
+    { "id": "verify", "title": "OAuth App Verification Help Center", "url": "https://support.google.com/cloud/answer/13463073" },
+    { "id": "casa", "title": "App Defense Alliance: CASA", "url": "https://appdefensealliance.dev/casa" }
+  ]
+}

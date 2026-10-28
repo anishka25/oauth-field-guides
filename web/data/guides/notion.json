@@ -1,0 +1,65 @@
+{
+  "slug": "notion",
+  "name": "Notion",
+  "website": "https://developers.notion.com",
+  "category": "Docs & knowledge",
+  "summary": "Notion has two paths. A public integration has a short self-serve form with no review. The hosted MCP server supports Dynamic Client Registration, so an agent can register its own OAuth client without a developer account.",
+  "origin": "curated",
+  "mode": "research-only",
+  "lastVerified": "2026-10-27",
+  "verdict": { "difficulty": 1, "label": "Easy", "headline": "Public integration in 10 minutes with no review. Via MCP, an agent can register an OAuth client by itself." },
+  "timeline": {
+    "setupMinutes": { "min": 1, "max": 15 },
+    "approvalWait": { "min": 0, "max": 0, "unit": "none", "appliesWhen": "never; the Notion integration gallery listing is optional" },
+    "summary": "Immediate"
+  },
+  "agentVsHuman": {
+    "agent": [
+      "Register an OAuth client on mcp.notion.com/register via DCR (no developer account)",
+      "Run the PKCE flow against mcp.notion.com/authorize",
+      "Prepare the public integration form fields"
+    ],
+    "human": [
+      "Sign in to Notion and approve the consent screen (choose which pages to share)",
+      "For a classic public integration: create it in the integrations dashboard and copy the secret"
+    ]
+  },
+  "steps": [
+    { "title": "Pick a path: MCP (DCR) or classic public integration", "detail": "MCP: the agent calls Notion's hosted MCP tools, and the OAuth client is created on the fly. Classic: you get REST API access with a fixed client_id/secret that you own.", "actor": "agent", "duration": "1 min", "url": null, "copyables": [], "evidence": { "kind": "sourced", "sourceIds": ["mcp", "auth"], "note": "" } },
+    { "title": "MCP path: register a client via DCR", "detail": "POST client metadata (redirect_uris, client_name) to the registration endpoint and receive a client_id. No account is needed for this step.", "actor": "agent", "duration": "seconds", "url": null, "copyables": [ { "label": "Register", "value": "https://mcp.notion.com/register" } ], "evidence": { "kind": "tested", "sourceIds": [], "note": "Discovery doc at mcp.notion.com lists registration_endpoint and S256 PKCE" } },
+    { "title": "Classic path: create a public integration", "detail": "notion.so/profile/integrations → New integration → type Public. Fill in redirect URIs, company name, website, privacy policy and terms URLs.", "actor": "human", "duration": "10 min", "url": "https://www.notion.so/profile/integrations", "copyables": [], "evidence": { "kind": "sourced", "sourceIds": ["auth"], "note": "" } },
+    { "title": "User consents and picks pages", "detail": "Notion's consent screen makes the user select which pages and databases to share. The agent only sees what was shared.", "actor": "human", "duration": "1 min", "url": null, "copyables": [], "evidence": { "kind": "sourced", "sourceIds": ["auth"], "note": "" } }
+  ],
+  "requirements": [
+    { "item": "Privacy policy + terms URLs", "required": "conditional", "note": "Required on the public integration form.", "evidence": { "kind": "sourced", "sourceIds": ["auth"], "note": "" } },
+    { "item": "Workspace owner permission", "required": "conditional", "note": "Some workspaces restrict who can add integrations.", "evidence": { "kind": "inferred", "sourceIds": [], "note": "Based on admin settings; not verified" } }
+  ],
+  "scopes": [],
+  "endpoints": {
+    "authorizeUrl": "https://api.notion.com/v1/oauth/authorize",
+    "tokenUrl": "https://api.notion.com/v1/oauth/token",
+    "discoveryUrl": "https://mcp.notion.com/.well-known/oauth-authorization-server",
+    "pkce": "supported",
+    "dynamicRegistration": "yes",
+    "refreshTokens": "Classic: yes. MCP: yes",
+    "tokenLifetime": "Not documented for classic public integrations",
+    "evidence": { "kind": "tested", "sourceIds": ["auth"], "note": "MCP discovery: registration_endpoint present, PKCE S256. api.notion.com has no discovery doc (400)" }
+  },
+  "blockers": [
+    { "symptom": "API returns 404 for a page that exists", "cause": "The user didn't share that page with the integration during consent.", "fix": "Re-run consent or have the user add the integration via the page's ••• → Connections menu." }
+  ],
+  "gotchas": [
+    { "title": "No scopes, only page-level sharing", "detail": "Notion doesn't use OAuth scopes. Access is whatever the user selects, so agents should handle 'not shared' gracefully.", "severity": "info" },
+    { "title": "DCR clients are per-agent, not per-brand", "detail": "The consent screen shows the client_name you registered. You don't get the same control over branding as with a classic integration.", "severity": "info" }
+  ],
+  "tested": [
+    { "check": "GET mcp.notion.com/.well-known/oauth-authorization-server", "result": "200, registration_endpoint=https://mcp.notion.com/register, PKCE [S256]", "outcome": "pass" },
+    { "check": "GET api.notion.com/.well-known/oauth-authorization-server", "result": "400, no discovery for the classic API", "outcome": "fail" },
+    { "check": "GET /v1/oauth/authorize with zero UUID client_id", "result": "302 → app.notion.com/install-integration (validated after login)", "outcome": "blocked" }
+  ],
+  "uncertainties": [ "We didn't POST to /register to avoid creating a stray client; the DCR claim comes from published metadata." ],
+  "sources": [
+    { "id": "auth", "title": "Notion: Authorization (public integrations)", "url": "https://developers.notion.com/docs/authorization" },
+    { "id": "mcp", "title": "Notion MCP", "url": "https://developers.notion.com/docs/mcp" }
+  ]
+}

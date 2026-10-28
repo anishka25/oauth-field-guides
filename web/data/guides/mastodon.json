@@ -1,0 +1,56 @@
+{
+  "slug": "mastodon",
+  "name": "Mastodon",
+  "website": "https://mastodon.social",
+  "category": "Social",
+  "summary": "Mastodon lets anyone register an OAuth app with one unauthenticated API call, per server. The catch is federation: every user's server is a different authorization server, so you register dynamically, per instance.",
+  "origin": "curated",
+  "mode": "research-only",
+  "lastVerified": "2026-10-27",
+  "verdict": { "difficulty": 1, "label": "Easy", "headline": "Fully agent-completable: apps are registered by an anonymous API call. Plan for one client per instance." },
+  "timeline": {
+    "setupMinutes": { "min": 1, "max": 5 },
+    "approvalWait": { "min": 0, "max": 0, "unit": "none", "appliesWhen": "never" },
+    "summary": "Seconds"
+  },
+  "agentVsHuman": {
+    "agent": [
+      "Discover the user's instance metadata (/.well-known/oauth-authorization-server)",
+      "Register an app via POST app_registration_endpoint (/api/v1/apps)",
+      "Run the PKCE authorization-code flow"
+    ],
+    "human": [ "Each user signs in to their own instance and approves" ]
+  },
+  "steps": [
+    { "title": "Ask the user for their instance", "detail": "For example, mastodon.social or hachyderm.io. Store the client per instance.", "actor": "agent", "duration": "seconds", "url": null, "copyables": [], "evidence": { "kind": "sourced", "sourceIds": ["apps"], "note": "" } },
+    { "title": "Fetch authorization server metadata", "detail": "Mastodon 4.3+ publishes RFC 8414 metadata with a non-standard 'app_registration_endpoint' rather than 'registration_endpoint'.", "actor": "agent", "duration": "seconds", "url": null, "copyables": [ { "label": "Metadata", "value": "https://mastodon.social/.well-known/oauth-authorization-server" } ], "evidence": { "kind": "tested", "sourceIds": [], "note": "app_registration_endpoint=https://mastodon.social/api/v1/apps" } },
+    { "title": "Register the app", "detail": "POST /api/v1/apps with client_name, redirect_uris and scopes. Returns client_id and client_secret, with no auth needed.", "actor": "agent", "duration": "seconds", "url": null, "copyables": [ { "label": "Scopes", "value": "read write:statuses" } ], "evidence": { "kind": "sourced", "sourceIds": ["apps"], "note": "We didn't POST, to avoid creating stray apps" } },
+    { "title": "User authorizes", "detail": "Redirect to /oauth/authorize with PKCE S256, then exchange the code at /oauth/token.", "actor": "human", "duration": "1 min", "url": null, "copyables": [], "evidence": { "kind": "sourced", "sourceIds": ["oauth"], "note": "" } }
+  ],
+  "requirements": [ { "item": "Nothing beyond a redirect URI", "required": "required", "note": "Some instances rate-limit app creation.", "evidence": { "kind": "sourced", "sourceIds": ["apps"], "note": "" } } ],
+  "scopes": [
+    { "name": "read", "tier": "basic", "purpose": "Read timelines and accounts" },
+    { "name": "write:statuses", "tier": "basic", "purpose": "Post on the user's behalf" }
+  ],
+  "endpoints": {
+    "authorizeUrl": "https://{instance}/oauth/authorize",
+    "tokenUrl": "https://{instance}/oauth/token",
+    "discoveryUrl": "https://{instance}/.well-known/oauth-authorization-server",
+    "pkce": "supported",
+    "dynamicRegistration": "yes",
+    "refreshTokens": "No (tokens are long-lived)",
+    "tokenLifetime": "Until revoked",
+    "evidence": { "kind": "tested", "sourceIds": ["oauth"], "note": "mastodon.social metadata fetched: PKCE S256, 47 scopes" }
+  },
+  "blockers": [ { "symptom": "Works on mastodon.social, fails on another server", "cause": "Client IDs are per-instance, or the server runs an older version without metadata.", "fix": "Register on every instance; fall back to /api/v1/apps directly if metadata is 404." } ],
+  "gotchas": [ { "title": "Not standard DCR", "detail": "Generic RFC 7591 clients look for 'registration_endpoint' and won't find it. Handle 'app_registration_endpoint' explicitly.", "severity": "warn" } ],
+  "tested": [
+    { "check": "GET mastodon.social/.well-known/oauth-authorization-server", "result": "200, app_registration_endpoint=/api/v1/apps, PKCE [S256]", "outcome": "pass" },
+    { "check": "GET /oauth/authorize?client_id=fake", "result": "302 → /auth/sign_in (validated after login)", "outcome": "blocked" }
+  ],
+  "uncertainties": [ "Behavior varies across forks (Pleroma, Misskey) and older Mastodon versions." ],
+  "sources": [
+    { "id": "apps", "title": "Mastodon API: apps", "url": "https://docs.joinmastodon.org/methods/apps/" },
+    { "id": "oauth", "title": "Mastodon API: OAuth", "url": "https://docs.joinmastodon.org/methods/oauth/" }
+  ]
+}

@@ -1,0 +1,356 @@
+{
+  "slug": "linear",
+  "name": "Linear",
+  "website": "https://linear.app",
+  "category": "Project management",
+  "summary": "Register an OAuth application in Linear’s settings, provide app and developer details, add redirect URIs, then request only the scopes your integration needs. OAuth setup is self-serve; appearing in Linear’s Integration Directory is a separate discretionary submission, with Linear saying it generally accepts useful integrations built by formal companies.",
+  "origin": "agent",
+  "mode": "hands-on",
+  "lastVerified": "2026-10-27",
+  "verdict": {
+    "difficulty": 2,
+    "label": "Moderate",
+    "headline": "Self-serve OAuth setup; directory listing is a separate discretionary review"
+  },
+  "timeline": {
+    "setupMinutes": {
+      "min": 10,
+      "max": 25
+    },
+    "approvalWait": {
+      "min": 0,
+      "max": 0,
+      "unit": "none",
+      "appliesWhen": "OAuth setup and authorization; no separate OAuth approval wait was documented"
+    },
+    "summary": "The app can be created in Linear settings and used for OAuth without a documented review stage. Directory listing is a separate submission and Linear publishes no review SLA."
+  },
+  "agentVsHuman": {
+    "agent": [
+      "Prepare the OAuth authorization and PKCE flow, callback handling, and scope selection.",
+      "Prepare app metadata and redirect URI values for the registration form.",
+      "Implement refresh-token handling and securely store credentials."
+    ],
+    "human": [
+      "Sign in to Linear and create the application in settings.",
+      "Choose the app’s name, developer, homepage, distribution, redirect URIs, and any optional grant or webhook settings.",
+      "Approve the integration in Linear; workspace admins must complete installation when the app uses actor=app.",
+      "Submit a separate Integration Directory listing if desired."
+    ]
+  },
+  "steps": [
+    {
+      "title": "Choose the app type and minimum permissions",
+      "detail": "For user-authorized access, use the standard OAuth flow and start with read if read-only access is sufficient. Add write or targeted scopes such as issues:create or comments:create only when needed. For agent installation as the app, use actor=app and consider app:assignable or app:mentionable only if those features are required; workspace admin approval is required for that installation.",
+      "actor": "agent",
+      "duration": "5–10 minutes",
+      "url": "https://linear.app/developers/oauth-2-0-authentication",
+      "copyables": [],
+      "evidence": {
+        "kind": "sourced",
+        "sourceIds": [
+          "oauth-docs",
+          "agent-docs"
+        ],
+        "note": "Linear documents standard and agent OAuth flows, scope meanings, and admin requirement for actor=app."
+      }
+    },
+    {
+      "title": "Create the OAuth application",
+      "detail": "Sign in to Linear, open the application creation page, and enter a user-visible app name, developer name, homepage URL, and at least one exact redirect URI. The client name must not include “Linear” or an http/https URL. Select private distribution for workspace-only use or public distribution if the app should be installable by other workspaces. Save the app and copy its client ID; keep any client secret private.",
+      "actor": "human",
+      "duration": "5–10 minutes",
+      "url": "https://linear.app/settings/api/applications/new",
+      "copyables": [],
+      "evidence": {
+        "kind": "sourced",
+        "sourceIds": [
+          "manifest-docs"
+        ],
+        "note": "Official manifest documentation describes the registration page, required metadata, redirect URI rules, and private/public distribution."
+      }
+    },
+    {
+      "title": "Complete the OAuth authorization flow",
+      "detail": "Redirect the user to https://linear.app/oauth/authorize with response_type=code, client_id, the registered redirect_uri, scope, and a random state value. Use PKCE with code_challenge_method=S256 and retain the verifier. The user must sign in to Linear if needed and approve the requested access; validate the returned state before using the authorization code.",
+      "actor": "human",
+      "duration": "1–3 minutes per connected user",
+      "url": "https://linear.app/developers/oauth-2-0-authentication",
+      "copyables": [
+        {
+          "label": "Authorization endpoint",
+          "value": "https://linear.app/oauth/authorize"
+        },
+        {
+          "label": "Token endpoint",
+          "value": "https://api.linear.app/oauth/token"
+        }
+      ],
+      "evidence": {
+        "kind": "sourced",
+        "sourceIds": [
+          "oauth-docs"
+        ],
+        "note": "OAuth documentation specifies authorization parameters, PKCE, state validation, and the token endpoint."
+      }
+    },
+    {
+      "title": "Exchange the code and manage tokens",
+      "detail": "POST a URL-encoded authorization_code request to the token endpoint with client_id, code, the same redirect_uri, and code_verifier. Linear documents client_secret as optional for PKCE. Access tokens last 24 hours; securely store the returned refresh token and refresh access as needed. The hands-on exchange returned a Bearer token with expires_in 86399, refresh_token present, and scope read; token values were not retained in this guide.",
+      "actor": "agent",
+      "duration": "10–30 minutes to implement",
+      "url": "https://linear.app/developers/oauth-2-0-authentication",
+      "copyables": [],
+      "evidence": {
+        "kind": "tested",
+        "sourceIds": [
+          "oauth-docs"
+        ],
+        "note": "A PKCE token exchange succeeded; observed Bearer, expires_in 86399, refresh token present, scope read."
+      }
+    },
+    {
+      "title": "Optionally submit an Integration Directory listing",
+      "detail": "Directory listing is separate from OAuth app creation. Linear asks applicants to submit its listing form and provide listing assets. Its published criteria say it accepts integrations it considers useful and built by formal companies, and generally does not accept scripts, low-effort apps, or hobbyist apps. No review timeline is stated.",
+      "actor": "human",
+      "duration": "1–3 hours to prepare materials; review time unspecified",
+      "url": "https://linear.app/docs/integration-directory",
+      "copyables": [],
+      "evidence": {
+        "kind": "sourced",
+        "sourceIds": [
+          "directory-docs"
+        ],
+        "note": "Linear describes the separate listing submission process and acceptance criteria without an SLA."
+      }
+    },
+    {
+      "title": "Remove temporary test callback",
+      "detail": "If you added the sandbox callback for testing, remove it from the app’s registered redirect URIs and retain only your production callbacks.",
+      "actor": "human",
+      "duration": "1–2 minutes",
+      "url": "https://linear.app/settings/api/applications/new",
+      "copyables": [],
+      "evidence": {
+        "kind": "inferred",
+        "sourceIds": [
+          "manifest-docs"
+        ],
+        "note": "The temporary callback was used for this live test; removing it is a prudent cleanup step."
+      }
+    }
+  ],
+  "requirements": [
+    {
+      "item": "Linear account access",
+      "required": "required",
+      "note": "A human needs to sign in to Linear to create the app and approve the OAuth request.",
+      "evidence": {
+        "kind": "tested",
+        "sourceIds": [
+          "manifest-docs"
+        ],
+        "note": "App registration is in Linear settings; authorization was completed through the developer’s logged-in browser."
+      }
+    },
+    {
+      "item": "App metadata and callback",
+      "required": "required",
+      "note": "Provide app name, developer name, homepage URL, and at least one redirect URI. Names and redirect values have documented constraints.",
+      "evidence": {
+        "kind": "sourced",
+        "sourceIds": [
+          "manifest-docs"
+        ],
+        "note": "Official app manifest reference lists required fields and constraints."
+      }
+    },
+    {
+      "item": "Client ID",
+      "required": "required",
+      "note": "The registered application’s client ID is needed for authorization and code exchange.",
+      "evidence": {
+        "kind": "tested",
+        "sourceIds": [
+          "oauth-docs"
+        ],
+        "note": "The supplied client ID completed the sandbox authorization and PKCE exchange."
+      }
+    },
+    {
+      "item": "Client secret",
+      "required": "conditional",
+      "note": "Linear documents client_secret as optional for authorization-code token exchange using PKCE; do not expose it in client-side code if your configuration requires one.",
+      "evidence": {
+        "kind": "sourced",
+        "sourceIds": [
+          "oauth-docs"
+        ],
+        "note": "The PKCE token parameter list marks client_secret optional; this test exchanged successfully without one."
+      }
+    },
+    {
+      "item": "Directory listing materials",
+      "required": "optional",
+      "note": "For a directory listing, submit Linear’s form and provide listing images/assets; this is separate from creating an OAuth app.",
+      "evidence": {
+        "kind": "sourced",
+        "sourceIds": [
+          "directory-docs"
+        ],
+        "note": "Directory instructions specify the form and image assets."
+      }
+    }
+  ],
+  "scopes": [
+    {
+      "name": "read",
+      "tier": "basic",
+      "purpose": "Read access for the authorizing user; Linear says it is always present."
+    },
+    {
+      "name": "write",
+      "tier": "sensitive",
+      "purpose": "General write access for the user’s account."
+    },
+    {
+      "name": "issues:create",
+      "tier": "sensitive",
+      "purpose": "Create issues and attachments."
+    },
+    {
+      "name": "comments:create",
+      "tier": "sensitive",
+      "purpose": "Create issue comments."
+    },
+    {
+      "name": "admin",
+      "tier": "restricted",
+      "purpose": "Admin-level endpoints; Linear says to request only when essential."
+    },
+    {
+      "name": "app:assignable",
+      "tier": "sensitive",
+      "purpose": "Allow an app actor to be assigned as a delegate and become a project member."
+    },
+    {
+      "name": "app:mentionable",
+      "tier": "sensitive",
+      "purpose": "Allow an app actor to be mentioned in issues, documents, and editor surfaces."
+    }
+  ],
+  "endpoints": {
+    "authorizeUrl": "https://linear.app/oauth/authorize",
+    "tokenUrl": "https://api.linear.app/oauth/token",
+    "discoveryUrl": "https://api.linear.app/.well-known/oauth-authorization-server",
+    "pkce": "supported",
+    "dynamicRegistration": "unknown",
+    "refreshTokens": "Yes; user OAuth responses include a refresh token. PKCE refresh can use client_id without client_secret.",
+    "tokenLifetime": "Access token expires in 24 hours (observed expires_in 86399); refresh tokens are returned.",
+    "evidence": {
+      "kind": "tested",
+      "sourceIds": [
+        "oauth-docs"
+      ],
+      "note": "Discovery endpoint returned authorization/token URLs and S256 support; successful PKCE exchange returned a refresh token."
+    }
+  },
+  "blockers": [
+    {
+      "symptom": "App does not appear as a public integration in Linear’s directory.",
+      "cause": "Creating a public-distribution OAuth app does not itself submit a directory listing; directory inclusion is a separate discretionary process.",
+      "fix": "Submit the Integration Directory form and required assets; confirm eligibility with Linear if the app does not meet its published company/usefulness criteria."
+    },
+    {
+      "symptom": "Agent installation cannot be approved by the current user.",
+      "cause": "Linear requires workspace admin permissions for actor=app installation.",
+      "fix": "Have a workspace admin complete the installation."
+    }
+  ],
+  "gotchas": [
+    {
+      "title": "Directory review is separate",
+      "detail": "OAuth app setup and directory listing are distinct. Linear states qualitative acceptance criteria but provides no review SLA.",
+      "severity": "warn"
+    },
+    {
+      "title": "Use least privilege",
+      "detail": "Start with read for read-only integrations. Add write or narrower create scopes only when required; admin scope is especially powerful.",
+      "severity": "warn"
+    },
+    {
+      "title": "Agent actor constraints",
+      "detail": "actor=app requires workspace admin installation and cannot be combined with admin scope.",
+      "severity": "warn"
+    },
+    {
+      "title": "Exact callback match",
+      "detail": "Use the same registered redirect URI in the authorization and token requests; remove temporary test callbacks after testing.",
+      "severity": "warn"
+    }
+  ],
+  "tested": [
+    {
+      "check": "OAuth authorization server metadata",
+      "result": "GET https://api.linear.app/.well-known/oauth-authorization-server returned HTTP 200 with authorize endpoint https://linear.app/oauth/authorize, token endpoint https://api.linear.app/oauth/token, code_challenge_methods_supported [S256], and no registration_endpoint.",
+      "outcome": "pass"
+    },
+    {
+      "check": "OpenID configuration metadata",
+      "result": "GET https://api.linear.app/.well-known/openid-configuration returned HTTP 404. The corresponding path on linear.app also returned HTTP 404.",
+      "outcome": "blocked"
+    },
+    {
+      "check": "Fake client authorization request",
+      "result": "GET to the documented authorization endpoint with a fake client ID returned HTTP 200 and no redirect Location header. This probe alone did not expose a clear invalid_client response.",
+      "outcome": "blocked"
+    },
+    {
+      "check": "Registration endpoint",
+      "result": "No registration_endpoint was advertised by the authorization server metadata, so no registration POST was made.",
+      "outcome": "pass"
+    },
+    {
+      "check": "Developer-created client authorization request",
+      "result": "The supplied client ID received a callback redirect with an authorization code and matching state for the registered sandbox redirect URI and scope read.",
+      "outcome": "pass"
+    },
+    {
+      "check": "PKCE token exchange",
+      "result": "Exchange without a client secret succeeded; response metadata was token_type Bearer, expires_in 86399, refresh token present, scope read. Token values were not recorded.",
+      "outcome": "pass"
+    }
+  ],
+  "uncertainties": [
+    "Linear’s app creation screen’s full live form requirements were not independently observed; the developer supplied the client ID, and official manifest documentation describes the required fields.",
+    "No OAuth app review or approval stage, nor a directory review duration, is documented in the sources checked.",
+    "Discovery metadata did not advertise a registration_endpoint; dynamic client registration support is therefore unknown."
+  ],
+  "sources": [
+    {
+      "id": "oauth-docs",
+      "title": "OAuth 2.0 authentication – Linear Developers",
+      "url": "https://linear.app/developers/oauth-2-0-authentication"
+    },
+    {
+      "id": "manifest-docs",
+      "title": "OAuth application manifests – Linear Developers",
+      "url": "https://linear.app/developers/oauth-app-manifests"
+    },
+    {
+      "id": "agent-docs",
+      "title": "Getting Started – Linear Developers",
+      "url": "https://linear.app/developers/agents"
+    },
+    {
+      "id": "directory-docs",
+      "title": "Integration Directory – Linear Docs",
+      "url": "https://linear.app/docs/integration-directory"
+    },
+    {
+      "id": "discovery",
+      "title": "OAuth authorization server metadata",
+      "url": "https://api.linear.app/.well-known/oauth-authorization-server"
+    }
+  ]
+}

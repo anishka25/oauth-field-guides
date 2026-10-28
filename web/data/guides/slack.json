@@ -1,0 +1,78 @@
+{
+  "slug": "slack",
+  "name": "Slack",
+  "website": "https://api.slack.com",
+  "category": "Communication",
+  "summary": "A Slack app can be created and installed in your own workspace in minutes. Installing into other workspaces requires turning on public distribution. A Slack Marketplace listing is optional but adds a review that takes weeks.",
+  "origin": "curated",
+  "mode": "research-only",
+  "lastVerified": "2026-10-27",
+  "verdict": { "difficulty": 2, "label": "Moderate", "headline": "Working in your workspace in 15 minutes. Other workspaces need public distribution, and the Marketplace adds weeks." },
+  "timeline": {
+    "setupMinutes": { "min": 15, "max": 45 },
+    "approvalWait": { "min": 0, "max": 10, "unit": "weeks", "appliesWhen": "only if you list in the Slack Marketplace; public distribution itself has no review" },
+    "summary": "No wait to distribute; Marketplace review is optional"
+  },
+  "agentVsHuman": {
+    "agent": [
+      "Generate an app manifest (YAML/JSON) with scopes, redirect URLs and event subscriptions",
+      "Choose bot vs user token scopes for your use case",
+      "Exercise the oauth.v2.access exchange once you paste a client_id"
+    ],
+    "human": [
+      "Sign in to api.slack.com and create the app from the manifest",
+      "Install into a workspace where you're an admin (or ask an admin)",
+      "Turn on public distribution (requires an https redirect URL)",
+      "Submit to the Marketplace if you want a listing"
+    ]
+  },
+  "steps": [
+    { "title": "Create app from a manifest", "detail": "api.slack.com/apps → Create New App → From a manifest. The manifest captures scopes and redirect URLs, so the agent can write it for you.", "actor": "agent", "duration": "5 min", "url": "https://api.slack.com/apps?new_app=1", "copyables": [ { "label": "Bot scopes", "value": "chat:write,channels:read,channels:history,users:read" } ], "evidence": { "kind": "sourced", "sourceIds": ["manifest"], "note": "" } },
+    { "title": "Add redirect URLs", "detail": "OAuth & Permissions → Redirect URLs. Must be https for public distribution. Localhost works only for single-workspace dev.", "actor": "human", "duration": "2 min", "url": null, "copyables": [], "evidence": { "kind": "sourced", "sourceIds": ["oauth"], "note": "" } },
+    { "title": "Install to your workspace", "detail": "This gives you a bot token (xoxb-) immediately, which is enough for internal agents.", "actor": "human", "duration": "1 min", "url": null, "copyables": [], "evidence": { "kind": "sourced", "sourceIds": ["oauth"], "note": "" } },
+    { "title": "Activate public distribution", "detail": "Manage Distribution → remove hard-coded info → Activate. There's no review; any workspace can now install via /oauth/v2/authorize.", "actor": "human", "duration": "5 min", "url": null, "copyables": [], "evidence": { "kind": "sourced", "sourceIds": ["distribute"], "note": "" } },
+    { "title": "(Optional) Slack Marketplace review", "detail": "Requires privacy policy, support page, landing page, and a review of scopes and security practices.", "actor": "wait", "duration": "2–10 weeks", "url": "https://api.slack.com/slack-marketplace/guidelines", "copyables": [], "evidence": { "kind": "inferred", "sourceIds": ["market"], "note": "Slack lists requirements but no SLA; duration is from community reports" } }
+  ],
+  "requirements": [
+    { "item": "Workspace where you can install apps", "required": "required", "note": "Many corporate workspaces require admin approval for new apps.", "evidence": { "kind": "sourced", "sourceIds": ["oauth"], "note": "" } },
+    { "item": "HTTPS redirect URL", "required": "conditional", "note": "Required to activate public distribution.", "evidence": { "kind": "sourced", "sourceIds": ["distribute"], "note": "" } },
+    { "item": "Privacy policy + support URL", "required": "conditional", "note": "Marketplace only.", "evidence": { "kind": "sourced", "sourceIds": ["market"], "note": "" } }
+  ],
+  "scopes": [
+    { "name": "chat:write", "tier": "basic", "purpose": "Post messages as the bot" },
+    { "name": "channels:history", "tier": "sensitive", "purpose": "Read public channel messages" },
+    { "name": "im:history / groups:history", "tier": "sensitive", "purpose": "Read DMs and private channels, which reviewers scrutinize" }
+  ],
+  "endpoints": {
+    "authorizeUrl": "https://slack.com/oauth/v2/authorize",
+    "tokenUrl": "https://slack.com/api/oauth.v2.access",
+    "discoveryUrl": "https://slack.com/.well-known/openid-configuration",
+    "pkce": "supported",
+    "dynamicRegistration": "no",
+    "refreshTokens": "Only if token rotation is enabled",
+    "tokenLifetime": "No expiry by default · 12h with rotation",
+    "evidence": { "kind": "tested", "sourceIds": ["oauth"], "note": "OIDC discovery exists but covers Sign in with Slack only; the v2 bot flow isn't listed in it" }
+  },
+  "blockers": [
+    { "symptom": "'Something went wrong when authorizing this app' in another workspace", "cause": "Public distribution isn't activated.", "fix": "Manage Distribution → Activate Public Distribution." },
+    { "symptom": "Admin approval required", "cause": "The target workspace restricts app installs.", "fix": "Users can request approval; a workspace admin approves under Manage apps." }
+  ],
+  "gotchas": [
+    { "title": "OIDC discovery ≠ the bot OAuth flow", "detail": "slack.com/.well-known/openid-configuration describes 'Sign in with Slack' (openid scopes) only. Bot installs use /oauth/v2/authorize, which isn't in the discovery doc.", "severity": "warn" },
+    { "title": "Rate limits on history methods for non-Marketplace apps", "detail": "Slack has tightened conversations.history rate limits for commercially distributed apps that aren't Marketplace-approved. Check the current limits before you rely on reading history.", "severity": "warn" }
+  ],
+  "tested": [
+    { "check": "GET slack.com/.well-known/openid-configuration", "result": "200, authorize=/openid/connect/authorize, 3 scopes (openid, email, profile), no registration_endpoint", "outcome": "pass" },
+    { "check": "GET /oauth/v2/authorize with fake client_id", "result": "200 HTML (Slack renders a page and doesn't return an OAuth error to a redirect)", "outcome": "blocked" }
+  ],
+  "uncertainties": [
+    "The exact rate-limit numbers for non-Marketplace apps should be confirmed on the current Slack changelog.",
+    "Marketplace review duration isn't published."
+  ],
+  "sources": [
+    { "id": "oauth", "title": "Slack: Installing with OAuth", "url": "https://api.slack.com/authentication/oauth-v2" },
+    { "id": "manifest", "title": "Slack: App manifests", "url": "https://api.slack.com/reference/manifests" },
+    { "id": "distribute", "title": "Slack: Distributing your app", "url": "https://api.slack.com/start/distributing" },
+    { "id": "market", "title": "Slack Marketplace guidelines", "url": "https://api.slack.com/slack-marketplace/guidelines" }
+  ]
+}

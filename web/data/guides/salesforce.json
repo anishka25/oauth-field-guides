@@ -1,0 +1,73 @@
+{
+  "slug": "salesforce",
+  "name": "Salesforce",
+  "website": "https://developer.salesforce.com",
+  "category": "CRM",
+  "summary": "Creating an External Client App (formerly Connected App) in a free Developer Edition org takes about 30 minutes. Serving customers' orgs at scale typically means packaging, and AppExchange listing requires a paid security review.",
+  "origin": "curated",
+  "mode": "research-only",
+  "lastVerified": "2026-10-27",
+  "verdict": { "difficulty": 4, "label": "Hard", "headline": "Works in your Dev org in about 30 minutes. AppExchange distribution means a paid security review that takes weeks." },
+  "timeline": {
+    "setupMinutes": { "min": 30, "max": 120 },
+    "approvalWait": { "min": 4, "max": 10, "unit": "weeks", "appliesWhen": "only if you list on AppExchange; customer orgs may also need admin pre-approval" },
+    "summary": "Fast for dev; distribution is the slow part"
+  },
+  "agentVsHuman": {
+    "agent": [
+      "Recommend scopes (api, refresh_token) and the right flow (web server + PKCE)",
+      "Draft the security-review questionnaire and the pen-test scope",
+      "Probe the authorize endpoint to confirm your consumer key (Salesforce rejects unknown keys without login)"
+    ],
+    "human": [
+      "Sign up for a free Developer Edition org (email verification)",
+      "Create the External Client App in Setup and copy the consumer key/secret",
+      "Pay the AppExchange security review fee and work with the Partner Community"
+    ]
+  },
+  "steps": [
+    { "title": "Get a Developer Edition org", "detail": "Free sign-up at developer.salesforce.com/signup. You need email verification before you can sign in.", "actor": "human", "duration": "10 min", "url": "https://developer.salesforce.com/signup", "copyables": [], "evidence": { "kind": "sourced", "sourceIds": ["eca"], "note": "" } },
+    { "title": "Create an External Client App", "detail": "Setup → External Client App Manager → New. Enable OAuth, set the callback URL, and choose scopes. Salesforce is steering new integrations from Connected Apps to External Client Apps.", "actor": "human", "duration": "10 min", "url": null, "copyables": [ { "label": "Scopes", "value": "api refresh_token offline_access" } ], "evidence": { "kind": "sourced", "sourceIds": ["eca"], "note": "" } },
+    { "title": "Wait for the app to propagate", "detail": "New apps can take up to ~10 minutes before the consumer key is accepted.", "actor": "wait", "duration": "2–10 min", "url": null, "copyables": [], "evidence": { "kind": "inferred", "sourceIds": [], "note": "Widely reported in docs and forums; not measured" } },
+    { "title": "Validate the consumer key", "detail": "Agent calls the authorize endpoint with your key. 'invalid_client_id' means it's not active yet, or you're using the wrong login host (use test.salesforce.com for sandboxes).", "actor": "agent", "duration": "1 min", "url": null, "copyables": [], "evidence": { "kind": "tested", "sourceIds": [], "note": "Fake key → 400 error=invalid_client_id, without login" } },
+    { "title": "(Distribution) AppExchange security review", "detail": "Join the partner program, package the app, and submit for security review (fee, pen-test evidence, documentation).", "actor": "wait", "duration": "4–10 weeks", "url": "https://developer.salesforce.com/docs/atlas.en-us.packagingGuide.meta/packagingGuide/security_review_overview.htm", "copyables": [], "evidence": { "kind": "sourced", "sourceIds": ["review"], "note": "Duration is inferred from community reports" } }
+  ],
+  "requirements": [
+    { "item": "Salesforce org (Dev Edition is free)", "required": "required", "note": "", "evidence": { "kind": "sourced", "sourceIds": ["eca"], "note": "" } },
+    { "item": "Customer admin approval", "required": "conditional", "note": "Orgs can set apps to 'Admin approved users are pre-authorized'.", "evidence": { "kind": "sourced", "sourceIds": ["eca"], "note": "" } },
+    { "item": "Security review fee", "required": "conditional", "note": "AppExchange listing only.", "evidence": { "kind": "sourced", "sourceIds": ["review"], "note": "" } }
+  ],
+  "scopes": [
+    { "name": "api", "tier": "sensitive", "purpose": "REST/SOAP API access as the user" },
+    { "name": "refresh_token offline_access", "tier": "basic", "purpose": "Long-lived access for agents" },
+    { "name": "full", "tier": "restricted", "purpose": "Everything; avoid it" }
+  ],
+  "endpoints": {
+    "authorizeUrl": "https://login.salesforce.com/services/oauth2/authorize",
+    "tokenUrl": "https://login.salesforce.com/services/oauth2/token",
+    "discoveryUrl": "https://login.salesforce.com/.well-known/openid-configuration",
+    "pkce": "supported",
+    "dynamicRegistration": "no",
+    "refreshTokens": "Yes (policy set per app)",
+    "tokenLifetime": "Session timeout of the org (often 2h)",
+    "evidence": { "kind": "tested", "sourceIds": [], "note": "Discovery advertises registration_endpoint, but POST without initial access token → 401" }
+  },
+  "blockers": [
+    { "symptom": "error=invalid_client_id right after creation", "cause": "The app hasn't propagated yet, or you're on the wrong login host.", "fix": "Wait about 10 minutes; use test.salesforce.com for sandbox orgs or the org's My Domain." },
+    { "symptom": "'OAUTH_APPROVAL_ERROR_GENERIC' for customer users", "cause": "The customer org blocks uninstalled connected apps.", "fix": "The customer admin installs or pre-approves the app (or you ship it as a managed package)." }
+  ],
+  "gotchas": [
+    { "title": "A registration_endpoint doesn't mean open DCR", "detail": "Salesforce's discovery document advertises /services/oauth2/register, but it needs an initial access token issued by an org admin. Agents can't self-register.", "severity": "warn" },
+    { "title": "Instance URL changes per org", "detail": "Store instance_url from the token response; API calls go there, not to login.salesforce.com.", "severity": "info" }
+  ],
+  "tested": [
+    { "check": "GET login.salesforce.com/.well-known/openid-configuration", "result": "200, PKCE [S256], registration_endpoint present, 39 scopes", "outcome": "pass" },
+    { "check": "POST /services/oauth2/register with {}", "result": "401: needs an initial access token, so no open DCR", "outcome": "fail" },
+    { "check": "GET /services/oauth2/authorize?client_id=fake", "result": "400 error=invalid_client_id (validated pre-login)", "outcome": "pass" }
+  ],
+  "uncertainties": [ "The current security review fee and timeline should be confirmed with the Partner Community.", "The rollout state of External Client App vs Connected App defaults varies by release." ],
+  "sources": [
+    { "id": "eca", "title": "Salesforce: External Client Apps", "url": "https://help.salesforce.com/s/articleView?id=sf.external_client_apps.htm" },
+    { "id": "review", "title": "AppExchange Security Review overview", "url": "https://developer.salesforce.com/docs/atlas.en-us.packagingGuide.meta/packagingGuide/security_review_overview.htm" }
+  ]
+}

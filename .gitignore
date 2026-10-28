@@ -1,0 +1,17 @@
+# secrets
+.env*
+!.env.example
+**/.git/gh-token
+
+# local tooling / deploy state
+.vercel
+.claude
+node_modules
+.next
+out
+*.tsbuildinfo
+next-env.d.ts
+
+# runtime output
+web/data/generated
+web/scripts/*.log

@@ -1,0 +1,76 @@
+{
+  "slug": "github",
+  "name": "GitHub",
+  "website": "https://github.com",
+  "category": "Developer tools",
+  "summary": "Creating a GitHub OAuth App (or GitHub App) is self-serve and takes minutes, with no review. The main decision is OAuth App vs GitHub App, and the main risk is that one OAuth App allows only one callback URL.",
+  "origin": "curated",
+  "mode": "research-only",
+  "lastVerified": "2026-10-27",
+  "verdict": { "difficulty": 1, "label": "Easy", "headline": "Self-serve in about 10 minutes. No review unless you list on GitHub Marketplace." },
+  "timeline": {
+    "setupMinutes": { "min": 5, "max": 15 },
+    "approvalWait": { "min": 0, "max": 0, "unit": "none", "appliesWhen": "never for private use; Marketplace listing is a separate, optional review" },
+    "summary": "Usable immediately after creation"
+  },
+  "agentVsHuman": {
+    "agent": [
+      "Pick OAuth App vs GitHub App based on whether you need fine-grained repo permissions",
+      "Prepare the form values: app name, homepage, callback URL, scopes",
+      "Run the authorization-code flow against your callback once you paste the client_id"
+    ],
+    "human": [
+      "Sign in to GitHub (and pass 2FA) to open Developer settings",
+      "Click 'Register application' and copy the client secret into your secret store",
+      "Approve the app for your organization if the org restricts third-party OAuth apps"
+    ]
+  },
+  "steps": [
+    { "title": "Choose OAuth App or GitHub App", "detail": "OAuth Apps act as the user with broad scopes (repo, user). GitHub Apps have fine-grained permissions, short-lived tokens and per-repo installation. For an agent acting on a user's repos, a GitHub App is usually the better long-term choice; OAuth Apps are simpler to start with.", "actor": "agent", "duration": "2 min", "url": "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/differences-between-github-apps-and-oauth-apps", "copyables": [], "evidence": { "kind": "sourced", "sourceIds": ["diff"], "note": "GitHub docs comparison page" } },
+    { "title": "Open Developer settings → OAuth Apps → New", "detail": "Requires a signed-in GitHub account. For an org-owned app, use the organization's settings instead.", "actor": "human", "duration": "1 min", "url": "https://github.com/settings/applications/new", "copyables": [], "evidence": { "kind": "tested", "sourceIds": [], "note": "Unauthenticated request redirects to github.com/login" } },
+    { "title": "Fill in the registration form", "detail": "Application name, homepage URL, and one Authorization callback URL. A callback on a subdirectory of the registered URL is accepted; a different host is not.", "actor": "human", "duration": "3 min", "url": null, "copyables": [ { "label": "Callback (local dev)", "value": "http://localhost:3000/api/auth/callback/github" } ], "evidence": { "kind": "sourced", "sourceIds": ["create", "redirect"], "note": "Callback URL rules from 'Authorizing OAuth apps'" } },
+    { "title": "Generate a client secret", "detail": "Shown once. Store it in your secret manager, never in the repo.", "actor": "human", "duration": "1 min", "url": null, "copyables": [], "evidence": { "kind": "sourced", "sourceIds": ["create"], "note": "" } },
+    { "title": "Test the authorization-code flow", "detail": "Send a user to /login/oauth/authorize with client_id, redirect_uri, scope and state, then exchange the code at /login/oauth/access_token. Ask for Accept: application/json, or the token comes back form-encoded.", "actor": "agent", "duration": "5 min", "url": null, "copyables": [ { "label": "Authorize", "value": "https://github.com/login/oauth/authorize?client_id=YOUR_ID&scope=repo%20read:user&state=RANDOM" } ], "evidence": { "kind": "sourced", "sourceIds": ["redirect"], "note": "" } }
+  ],
+  "requirements": [
+    { "item": "GitHub account with 2FA", "required": "required", "note": "2FA is mandatory for most contributors.", "evidence": { "kind": "inferred", "sourceIds": [], "note": "GitHub's 2FA mandate; not specific to OAuth apps" } },
+    { "item": "Single callback URL", "required": "required", "note": "OAuth Apps allow exactly one callback URL. Use separate apps for dev, staging and prod.", "evidence": { "kind": "sourced", "sourceIds": ["redirect"], "note": "" } },
+    { "item": "Org approval", "required": "conditional", "note": "Orgs with OAuth app access restrictions must approve your app before it can see org resources.", "evidence": { "kind": "sourced", "sourceIds": ["orgrestrict"], "note": "" } },
+    { "item": "Marketplace listing review", "required": "optional", "note": "Only needed to sell or list publicly on GitHub Marketplace.", "evidence": { "kind": "sourced", "sourceIds": ["market"], "note": "" } }
+  ],
+  "scopes": [
+    { "name": "read:user", "tier": "basic", "purpose": "Profile info" },
+    { "name": "repo", "tier": "sensitive", "purpose": "Full read/write to private repos. Very broad; consider a GitHub App instead" },
+    { "name": "workflow", "tier": "sensitive", "purpose": "Edit GitHub Actions workflow files" }
+  ],
+  "endpoints": {
+    "authorizeUrl": "https://github.com/login/oauth/authorize",
+    "tokenUrl": "https://github.com/login/oauth/access_token",
+    "discoveryUrl": null,
+    "pkce": "supported",
+    "dynamicRegistration": "no",
+    "refreshTokens": "OAuth Apps: no (tokens don't expire). GitHub Apps: yes, opt-in",
+    "tokenLifetime": "OAuth App: until revoked · GitHub App: 8h",
+    "evidence": { "kind": "tested", "sourceIds": ["redirect"], "note": "Probe: /.well-known/openid-configuration and oauth-authorization-server both 404" }
+  },
+  "blockers": [
+    { "symptom": "'The redirect_uri is not associated with this application'", "cause": "Host or port differs from the single registered callback.", "fix": "Register a separate OAuth App per environment, or use a GitHub App, which allows up to 10 callback URLs." },
+    { "symptom": "User authorized, but the API returns 404 on org repos", "cause": "The org has OAuth app access restrictions.", "fix": "An org owner approves the app under Org settings → Third-party access." }
+  ],
+  "gotchas": [
+    { "title": "Fake client_ids aren't rejected before login", "detail": "GitHub redirects to /login before it validates client_id, so you can't confirm an app exists without a signed-in browser.", "severity": "info" },
+    { "title": "OAuth App tokens never expire", "detail": "Great for agents, but a leaked token is valid until revoked. Store it encrypted and support revocation.", "severity": "warn" }
+  ],
+  "tested": [
+    { "check": "GET github.com/.well-known/openid-configuration", "result": "404, no OIDC/OAuth discovery document", "outcome": "fail" },
+    { "check": "GET /login/oauth/authorize?client_id=fake_probe_123", "result": "302 → github.com/login (client_id not validated before auth)", "outcome": "blocked" }
+  ],
+  "uncertainties": [ "Marketplace review duration isn't published; reports range from days to weeks." ],
+  "sources": [
+    { "id": "create", "title": "GitHub Docs: Creating an OAuth app", "url": "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/creating-an-oauth-app" },
+    { "id": "redirect", "title": "GitHub Docs: Authorizing OAuth apps", "url": "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps" },
+    { "id": "diff", "title": "GitHub Docs: Differences between GitHub Apps and OAuth apps", "url": "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/differences-between-github-apps-and-oauth-apps" },
+    { "id": "orgrestrict", "title": "GitHub Docs: OAuth app access restrictions", "url": "https://docs.github.com/en/organizations/managing-oauth-access-to-your-organizations-data/about-oauth-app-access-restrictions" },
+    { "id": "market", "title": "GitHub Docs: Listing on GitHub Marketplace", "url": "https://docs.github.com/en/apps/github-marketplace/listing-an-app-on-github-marketplace" }
+  ]
+}
